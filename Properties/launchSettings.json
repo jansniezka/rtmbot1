@@ -1,0 +1,24 @@
+{
+  "profiles": {
+    "RealTimeMediaBot": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://rtmbot.sniezka.com:443",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Production",
+        "ASPNETCORE_URLS": "https://rtmbot.sniezka.com:443"
+      }
+    },
+    "RealTimeMediaBot.Development": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://rtmbot.sniezka.com:443",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://rtmbot.sniezka.com:443"
+      }
+    }
+  }
+}
