@@ -1,255 +1,257 @@
-# Real-Time Media Bot dla Microsoft Teams
+# 🤖 Real-Time Media Bot dla Microsoft Teams
 
-Bot Teams napisany w C#, który komunikuje się z MS Teams przez Microsoft Graph Communications API i przechwytuje audio w czasie rzeczywistym ze spotkań.
+Bot Teams z możliwością przechwytywania audio w czasie rzeczywistym, wykorzystujący Microsoft Graph Communications API.
 
-## 🚨 WAŻNE: Konfiguracja wymagana przed uruchomieniem!
+## ✨ **Funkcjonalności**
 
-**Przed uruchomieniem bota musisz skonfigurować Azure AD!** Zobacz plik [KONFIGURACJA.md](KONFIGURACJA.md) ze szczegółowymi instrukcjami.
+- 📞 **Odbieranie połączeń przychodzących** - Bot automatycznie odbiera połączenia z Teams
+- 🎯 **Dołączanie do spotkań** - Możliwość dołączania do istniejących spotkań Teams
+- 🎵 **Przechwytywanie audio w czasie rzeczywistym** - Buforowanie audio klatka po klatce
+- 🔄 **Zarządzanie połączeniami** - Akceptowanie, odrzucanie, przekierowywanie, kończenie
+- 🌐 **Webhook'i Teams** - Obsługa powiadomień o połączeniach i audio media
+- 💾 **Zapis audio** - Zapis przechwyconego audio do plików WAV
+- 🔐 **Azure AD Authentication** - Bezpieczne uwierzytelnianie przez Microsoft Identity
+- 📊 **Monitorowanie statusu połączeń** - API do sprawdzania stanu aktywnych połączeń
 
-## 🌐 **Publiczny Endpoint**
+## 🏗️ **Architektura**
 
-Bot jest skonfigurowany do działania na publicznym endpoincie:
-- **URL**: `https://rtmbot.sniezka.com`
-- **Calling Endpoint**: `https://rtmbot.sniezka.com/api/calling`
-- **Port**: 443 (HTTPS)
-
-## Funkcjonalności
-
-- 🔐 Uwierzytelnianie przez Azure AD
-- 📞 Dołączanie do spotkań Teams
-- 🎵 Przechwytywanie audio w czasie rzeczywistym
-- 📦 Buforowanie audio klatka po klatce
-- 💾 Zapis audio do plików WAV
-- 📊 Monitorowanie statusu połączeń
-- 🌐 Publiczny endpoint HTTPS z certyfikatem SSL
-
-## Wymagania
-
-- .NET 6.0 lub nowszy
-- Konto Azure z zarejestrowanym Bot Service
-- Aplikacja Azure AD z odpowiednimi uprawnieniami
-- Microsoft Teams
-- **Publiczny adres IP z certyfikatem SSL** (skonfigurowany: rtmbot.sniezka.com)
-
-## 🚀 Szybki start
-
-### 1. Konfiguracja Azure AD (WYMAGANE!)
-```bash
-# Zobacz szczegółowe instrukcje
-cat KONFIGURACJA.md
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Microsoft     │    │   Real-Time      │    │   Azure AD &    │
+│   Teams        │◄──►│   Media Bot      │◄──►│   Bot Service   │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌──────────────────┐
+                       │   Audio Buffer   │
+                       │   & WAV Files   │
+                       └──────────────────┘
 ```
 
-### 2. Aktualizacja konfiguracji
-```bash
-# Skopiuj appsettings.Development.json i uzupełnij dane
-cp appsettings.Development.json appsettings.Local.json
-# Edytuj appsettings.Local.json i dodaj swoje dane Azure AD
+## 🚀 **Nowe funkcjonalności Microsoft Graph Communications API**
+
+### **1. Rzeczywiste połączenia z Teams**
+- ✅ **Odbieranie połączeń** - Bot może faktycznie odbierać połączenia przychodzące
+- ✅ **Dołączanie do spotkań** - Możliwość dołączania do istniejących spotkań Teams
+- ✅ **Zarządzanie połączeniami** - Pełna kontrola nad połączeniami
+
+### **2. Przechwytywanie audio**
+- ✅ **Audio Media Events** - Odbieranie audio w czasie rzeczywistym
+- ✅ **Buforowanie klatek** - Każda klatka audio jest buforowana osobno
+- ✅ **Zapis do WAV** - Automatyczny zapis audio do plików
+
+### **3. Webhook'i Teams**
+- ✅ **Incoming Call** - Powiadomienia o przychodzących połączeniach
+- ✅ **Call Updated** - Aktualizacje statusu połączeń
+- ✅ **Audio Media** - Powiadomienia o dostępności audio
+
+## 📋 **Wymagania**
+
+- **.NET 6.0** lub nowszy
+- **Azure Bot Service** z włączonymi funkcjami "calling bot"
+- **Azure AD App Registration** z odpowiednimi uprawnieniami
+- **Publiczny HTTPS endpoint** z certyfikatem SSL
+- **Microsoft Graph Communications API** uprawnienia
+
+## 🔧 **Konfiguracja Azure**
+
+### **1. Azure Bot Service**
+- Włącz "Calling bot" w ustawieniach bota
+- Skonfiguruj endpoint: `https://rtmbot.sniezka.com/api/calling`
+
+### **2. Azure AD App Registration**
+- **Redirect URI**: `https://rtmbot.sniezka.com/api/auth/callback`
+- **Platform**: Web
+- **Implicit grant**: Access tokens & ID tokens
+
+### **3. Microsoft Graph Permissions**
+- `Calls.AccessMedia.All`
+- `Calls.InitiateOutgoingCall.All`
+- `Calls.JoinGroupCall.All`
+- `Calls.JoinGroupCallAsGuest.All`
+
+## 📁 **Struktura projektu**
+
+```
+RealTimeMediaBot/
+├── Controllers/                 # HTTP API Controllers
+│   ├── AuthController.cs       # Azure AD authentication
+│   ├── CallsController.cs      # Zarządzanie połączeniami
+│   ├── MeetingsController.cs   # Zarządzanie spotkaniami
+│   └── TeamsWebhookController.cs # Webhook'i Teams
+├── Bots/                       # Logika bota
+│   ├── TeamsBot.cs            # Główna logika bota Teams
+│   └── BotHostedService.cs    # Background service
+├── Services/                   # Usługi aplikacji
+│   ├── AuthenticationService.cs # Azure AD auth
+│   ├── AudioCaptureService.cs  # Przechwytywanie audio
+│   └── GraphService.cs        # Microsoft Graph API
+├── Models/                     # Modele danych
+│   ├── Configuration.cs       # Konfiguracja
+│   ├── CallModels.cs          # Modele połączeń
+│   └── TeamsWebhookModels.cs  # Modele webhook'ów Teams
+└── appsettings.json           # Konfiguracja aplikacji
 ```
 
-### 3. Uruchomienie
+## 🎯 **API Endpoints**
+
+### **Główne endpoint'y**
+- `GET /` - Status aplikacji
+- `GET /health` - Health check
+- `GET /api/calling` - Informacje o calling API
+
+### **Zarządzanie połączeniami**
+- `POST /api/calls/incoming` - Symulacja przychodzącego połączenia
+- `POST /api/calls/answer/{callId}` - Akceptowanie połączenia
+- `POST /api/calls/reject/{callId}` - Odrzucanie połączenia
+- `POST /api/calls/transfer/{callId}` - Przekierowanie połączenia
+- `POST /api/calls/end/{callId}` - Kończenie połączenia
+- `GET /api/calls/status` - Status aktywnych połączeń
+
+### **Zarządzanie spotkaniami**
+- `POST /api/meetings/join` - Dołączanie do spotkania
+- `GET /api/meetings/status/{callId}` - Status spotkania
+- `POST /api/meetings/leave/{callId}` - Opuszczanie spotkania
+- `GET /api/meetings/active` - Lista aktywnych spotkań
+
+### **Audio management**
+- `GET /api/calls/audio/buffer-size` - Rozmiar bufora audio
+- `POST /api/calls/audio/save` - Zapis audio do pliku
+- `POST /api/calls/audio/clear` - Czyszczenie bufora audio
+
+### **Webhook'i Teams**
+- `POST /api/teamswebhook/calling` - Główny endpoint webhook'ów
+- `POST /api/teamswebhook/incoming-call` - Przychodzące połączenia
+- `POST /api/teamswebhook/call-updated` - Aktualizacje połączeń
+- `POST /api/teamswebhook/audio-media` - Audio media
+
+### **Authentication**
+- `GET /api/auth/callback` - Azure AD callback
+- `GET /api/auth/status` - Status uwierzytelniania
+- `POST /api/auth/refresh` - Odświeżanie tokenu
+
+## 🚀 **Instalacja i uruchomienie**
+
+### **1. Klonowanie repozytorium**
+```bash
+git clone <repository-url>
+cd real-time-media-bot
+```
+
+### **2. Konfiguracja**
+```bash
+# Skopiuj i skonfiguruj appsettings.json
+cp appsettings.json appsettings.Development.json
+# Edytuj plik z Twoimi danymi Azure
+```
+
+### **3. Uruchomienie**
 ```bash
 dotnet restore
 dotnet build
 dotnet run
 ```
 
-Bot uruchomi się na `https://rtmbot.sniezka.com:443`
+## 🧪 **Testowanie**
 
-## Konfiguracja
-
-### 1. Konfiguracja Azure Bot Service
-
-1. Zarejestruj bot w [Azure Bot Service](https://portal.azure.com/#create/Microsoft.BotService)
-2. Skonfiguruj Microsoft App ID i App Password
-3. Dodaj endpoint messaging dla Teams
-4. **Włącz calling bot** i ustaw endpoint: `https://rtmbot.sniezka.com/api/calling`
-
-### 2. Konfiguracja Azure AD
-
-1. Utwórz aplikację w Azure AD
-2. Dodaj uprawnienia Microsoft Graph:
-   - `Calls.JoinGroupCall.All`
-   - `Calls.InitiateGroupCall.All`
-   - `Calls.AccessMedia.All`
-3. Wygeneruj Client Secret
-
-### 3. Aktualizacja appsettings.json
-
-```json
-{
-  "AzureAd": {
-    "TenantId": "YOUR_TENANT_ID",
-    "ClientId": "YOUR_CLIENT_ID",
-    "ClientSecret": "YOUR_CLIENT_SECRET"
-  },
-  "Bot": {
-    "MicrosoftAppId": "YOUR_BOT_APP_ID",
-    "MicrosoftAppPassword": "YOUR_BOT_APP_PASSWORD",
-    "MicrosoftAppTenantId": "YOUR_TENANT_ID"
-  },
-  "Hosting": {
-    "Urls": "https://rtmbot.sniezka.com:443",
-    "PublicUrl": "https://rtmbot.sniezka.com"
-  }
-}
-```
-
-## Instalacja i uruchomienie
-
-### 1. Przywrócenie pakietów NuGet
-
+### **1. Test infrastruktury**
 ```bash
-dotnet restore
-```
-
-### 2. Uruchomienie aplikacji
-
-```bash
-dotnet run
-```
-
-### 3. Uruchomienie w trybie release
-
-```bash
-dotnet run --configuration Release
-```
-
-## Struktura projektu
-
-```
-RealTimeMediaBot/
-├── Bots/
-│   ├── TeamsBot.cs              # Główna logika bota Teams
-│   └── BotHostedService.cs      # Service hostujący bota
-├── Controllers/
-│   ├── CallsController.cs       # API dla połączeń
-│   └── TeamsWebhookController.cs # Webhook Teams
-├── Models/
-│   ├── Configuration.cs         # Modele konfiguracyjne
-│   ├── CallModels.cs            # Modele połączeń
-│   └── TeamsWebhookModels.cs    # Modele webhook
-├── Services/
-│   ├── AuthenticationService.cs # Uwierzytelnianie Azure AD
-│   ├── GraphService.cs          # Microsoft Graph API
-│   └── AudioCaptureService.cs   # Przechwytywanie audio
-├── Properties/
-│   └── launchSettings.json      # Konfiguracja uruchamiania
-├── Program.cs                   # Główny program
-├── appsettings.json            # Konfiguracja (szablon)
-├── appsettings.Development.json # Konfiguracja deweloperska
-├── KONFIGURACJA.md             # Instrukcje konfiguracji
-├── TESTOWANIE.md               # Instrukcje testowania
-└── RealTimeMediaBot.csproj     # Plik projektu
-```
-
-## 🌐 **Endpoint API**
-
-### **Główne endpointy:**
-- **`/`** - Status aplikacji
-- **`/health`** - Zdrowie aplikacji
-- **`/api/calling`** - Główny endpoint calling (GET)
-- **`/api/teamswebhook/calling`** - Webhook calling (POST)
-- **`/api/calls/status`** - Status połączeń
-- **`/api/calls/audio/*`** - Zarządzanie audio
-
-### **Testowanie publicznego endpoint:**
-```bash
-# Sprawdź status
+# Sprawdź status aplikacji
 curl https://rtmbot.sniezka.com/health
 
 # Sprawdź calling endpoint
 curl https://rtmbot.sniezka.com/api/calling
+```
 
+### **2. Test webhook'ów**
+```bash
+# Symuluj webhook z Teams
+curl -X POST https://rtmbot.sniezka.com/api/teamswebhook/calling \
+  -H "Content-Type: application/json" \
+  -d '{"resource": "/communications/calls/123", "changeType": "created"}'
+```
+
+### **3. Test zarządzania połączeniami**
+```bash
 # Sprawdź status połączeń
 curl https://rtmbot.sniezka.com/api/calls/status
+
+# Symuluj przychodzące połączenie
+curl -X POST https://rtmbot.sniezka.com/api/calls/incoming \
+  -H "Content-Type: application/json" \
+  -d '{"id": "test-call", "callerId": "test@example.com", "callerDisplayName": "Test User"}'
 ```
 
-## Użycie
-
-### Dołączanie do spotkania
-
-```csharp
-// Inicjalizacja bota
-await teamsBot.InitializeAsync();
-
-// Dołączanie do spotkania
-await teamsBot.JoinCallAsync("https://teams.microsoft.com/l/meetup-join/...");
-
-// Opuszczanie spotkania
-await teamsBot.LeaveCallAsync();
+### **4. Test dołączania do spotkań**
+```bash
+# Dołącz do spotkania
+curl -X POST https://rtmbot.sniezka.com/api/meetings/join \
+  -H "Content-Type: application/json" \
+  -d '{"meetingUrl": "https://teams.microsoft.com/l/meetup-join/...", "displayName": "Test Bot"}'
 ```
 
-### Przechwytywanie audio
+## 🔍 **Monitoring i logi**
 
-```csharp
-// Zapisanie bufora audio
-await audioCaptureService.SaveAudioBufferAsync("output.wav");
+### **1. Logi aplikacji**
+- Wszystkie operacje są logowane z poziomem `Information`
+- Błędy są logowane z poziomem `Error`
+- Debug informacje o audio są logowane z poziomem `Debug`
 
-// Wyczyszczenie bufora
-audioCaptureService.ClearBuffer();
+### **2. Status połączeń**
+```bash
+# Sprawdź aktywnych połączeń
+curl https://rtmbot.sniezka.com/api/calls/status
 
-// Sprawdzenie rozmiaru bufora
-var bufferSize = audioCaptureService.GetBufferSize();
+# Sprawdź rozmiar bufora audio
+curl https://rtmbot.sniezka.com/api/calls/audio/buffer-size
 ```
 
-## Buforowanie audio
+## 🛠️ **Rozwiązywanie problemów**
 
-Bot przechwytuje audio w czasie rzeczywistym i buforuje je klatka po klatce:
+### **1. Błędy uwierzytelniania**
+- Sprawdź konfigurację Azure AD w `appsettings.json`
+- Upewnij się, że Redirect URI jest poprawnie skonfigurowany
+- Sprawdź uprawnienia Microsoft Graph
 
-- **Maksymalny rozmiar bufora**: 1000 klatek
-- **Format audio**: 16 kHz, 16-bit, mono
-- **Buforowanie**: FIFO (First In, First Out)
-- **Automatyczne czyszczenie**: Najstarsze klatki są usuwane gdy bufor jest pełny
+### **2. Problemy z webhook'ami**
+- Sprawdź endpoint w Azure Bot Service
+- Upewnij się, że bot ma uprawnienia "calling bot"
+- Sprawdź logi aplikacji pod kątem błędów
 
-## Logowanie
+### **3. Problemy z audio**
+- Sprawdź czy `AudioCaptureService` jest poprawnie skonfigurowany
+- Upewnij się, że masz uprawnienia `Calls.AccessMedia.All`
+- Sprawdź logi audio media webhook'ów
 
-Aplikacja używa wbudowanego systemu logowania .NET:
+## 🔒 **Bezpieczeństwo**
 
-- **Poziom domyślny**: Information
-- **Microsoft**: Warning
-- **Format**: Strukturalne logowanie z parametrami
+- **HTTPS** - Wszystkie komunikacje przez HTTPS
+- **Azure AD** - Uwierzytelnianie przez Microsoft Identity
+- **Token caching** - Bezpieczne przechowywanie tokenów
+- **Webhook validation** - Walidacja webhook'ów z Teams
 
-## 🔒 Bezpieczeństwo
+## 📚 **Dokumentacja dodatkowa**
 
-- **Client Secret**: Przechowuj w Azure Key Vault w produkcji
-- **Uprawnienia**: Używaj minimalnych wymaganych uprawnień
-- **Logi**: Nie loguj wrażliwych danych
-- **HTTPS**: Używaj tylko bezpiecznych połączeń (skonfigurowane: rtmbot.sniezka.com)
-- **Pliki konfiguracyjne**: NIGDY nie commituj plików z rzeczywistymi danymi
+- [KONFIGURACJA.md](KONFIGURACJA.md) - Szczegółowa konfiguracja Azure
+- [TESTOWANIE.md](TESTOWANIE.md) - Instrukcje testowania
+- [Microsoft Graph Communications API](https://docs.microsoft.com/en-us/graph/api/resources/calls-api-overview)
 
-## Rozwiązywanie problemów
-
-### Błąd uwierzytelniania
-
-1. Sprawdź poprawność Client ID i Client Secret
-2. Upewnij się, że aplikacja ma odpowiednie uprawnienia
-3. Sprawdź Tenant ID
-4. Zobacz [KONFIGURACJA.md](KONFIGURACJA.md)
-
-### Błąd dołączania do spotkania
-
-1. Sprawdź poprawność URL spotkania
-2. Upewnij się, że bot ma uprawnienia do dołączania
-3. Sprawdź logi aplikacji
-
-### Problemy z audio
-
-1. Sprawdź uprawnienia `Calls.AccessMedia.All`
-2. Upewnij się, że spotkanie ma włączone audio
-3. Sprawdź rozmiar bufora audio
-
-### Problemy z publicznym endpoint
-
-1. Sprawdź czy certyfikat SSL jest poprawny
-2. Sprawdź czy port 443 jest otwarty
-3. Sprawdź czy DNS wskazuje na właściwy adres IP
-4. Sprawdź logi aplikacji
-
-## Wsparcie
+## 🤝 **Wsparcie**
 
 W przypadku problemów:
 1. Sprawdź logi aplikacji
-2. Sprawdź [KONFIGURACJA.md](KONFIGURACJA.md)
-3. Sprawdź [TESTOWANIE.md](TESTOWANIE.md)
-4. Sprawdź dokumentację Microsoft Graph
-5. Sprawdź status usług Azure
+2. Sprawdź konfigurację Azure
+3. Sprawdź uprawnienia Microsoft Graph
+4. Sprawdź endpoint'y webhook'ów
+
+## 📝 **Status implementacji**
+
+- ✅ **Infrastruktura HTTP** - Gotowa
+- ✅ **Azure AD Authentication** - Gotowe
+- ✅ **Webhook endpoints** - Gotowe
+- ✅ **Audio buffering** - Gotowe
+- ✅ **Microsoft Graph Communications API** - Gotowe
+- ✅ **Call management** - Gotowe
+- ✅ **Meeting management** - Gotowe
+
+**Bot jest gotowy do rzeczywistego testowania z Microsoft Teams!** 🎉

@@ -33,3 +33,28 @@ public class CallTransferRequest
     public string TargetUri { get; set; } = string.Empty;
     public string? TargetDisplayName { get; set; }
 }
+
+public class CallInfo
+{
+    public string CallId { get; set; } = string.Empty;
+    public string CallerId { get; set; } = string.Empty;
+    public string CallerDisplayName { get; set; } = string.Empty;
+    public CallState State { get; set; }
+    public string MeetingUrl { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
+    public DateTime LastUpdated { get; set; }
+}
+
+public class AudioData
+{
+    public string CallId { get; set; } = string.Empty;
+    public byte[] AudioBytes { get; set; } = Array.Empty<byte>();
+    public DateTime Timestamp { get; set; }
+}
+
+public class AudioFrame
+{
+    public string CallId { get; set; } = string.Empty;
+    public byte[] AudioData { get; set; } = Array.Empty<byte>();
+    public DateTime Timestamp { get; set; }
+}

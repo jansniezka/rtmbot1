@@ -45,18 +45,24 @@ app.MapControllers();
 // Endpoint statusu
 app.MapGet("/", () => "Real-Time Media Bot dla Teams jest uruchomiony na https://rtmbot.sniezka.com!");
 
-app.MapGet("/health", () => new { 
-    status = "healthy", 
+app.MapGet("/health", () => new {
+    status = "healthy",
     timestamp = DateTime.UtcNow,
     endpoint = "https://rtmbot.sniezka.com/api/calling",
     environment = app.Environment.EnvironmentName
 });
 
 // Endpoint zgodny z konfiguracją Azure Portal
-app.MapGet("/api/calling", () => new { 
+app.MapGet("/api/calling", () => new {
     message = "Calling endpoint jest aktywny",
     timestamp = DateTime.UtcNow,
-    status = "ready"
+    status = "ready",
+    features = new[] {
+        "Odbieranie połączeń przychodzących",
+        "Dołączanie do spotkań Teams",
+        "Przechwytywanie audio w czasie rzeczywistym",
+        "Zarządzanie połączeniami"
+    }
 });
 
 // Uruchom aplikację

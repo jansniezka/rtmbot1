@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using RealTimeMediaBot.Models;
 using RealTimeMediaBot.Services;
-using RealTimeMediaBot.Bots;
 using System.Text.Json;
+using RealTimeMediaBot.Bots;
 
 namespace RealTimeMediaBot.Controllers;
 
@@ -22,29 +22,46 @@ public class TeamsWebhookController : ControllerBase
         _teamsBot = teamsBot;
     }
 
-    // Główny endpoint calling zgodny z konfiguracją Azure Portal
-    [HttpPost("calling")]
+    [HttpPost("calling")] // Main calling endpoint as per Azure Portal config
     public async Task<IActionResult> HandleCallingWebhook()
     {
         try
         {
             _logger.LogInformation("Otrzymano webhook calling z Teams na publicznym endpoincie");
 
-            // Odczytaj body request
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
-            
+
             _logger.LogDebug("Calling webhook body: {Body}", body);
 
-            // Parsuj webhook data (Teams używa specyficznego formatu)
             var webhookData = ParseTeamsWebhook(body);
-            
+
             if (webhookData != null)
             {
-                // Przekaż do TeamsBot do obsługi
-                await _teamsBot.HandleIncomingCallWebhookAsync(webhookData);
-                
-                return Ok(new { message = "Calling webhook został przetworzony", endpoint = "https://rtmbot.sniezka.com/api/calling" });
+                // Określ typ webhook'a na podstawie resource i changeType
+                if (webhookData.Resource.Contains("/communications/calls/"))
+                {
+                    if (webhookData.ChangeType == "created")
+                    {
+                        await _teamsBot.HandleIncomingCallWebhookAsync(webhookData);
+                    }
+                    else if (webhookData.ChangeType == "updated")
+                    {
+                        await _teamsBot.HandleCallUpdatedWebhookAsync(webhookData);
+                    }
+                }
+                else if (webhookData.Resource.Contains("/audioMedia"))
+                {
+                    await _teamsBot.HandleAudioMediaWebhookAsync(webhookData);
+                }
+
+                return Ok(new { 
+                    message = "Calling webhook został przetworzony", 
+                    endpoint = "https://rtmbot.sniezka.com/api/calling",
+                    webhookType = DetermineWebhookType(webhookData),
+                    resource = webhookData.Resource,
+                    changeType = webhookData.ChangeType
+                });
             }
 
             return BadRequest(new { error = "Nieprawidłowy format webhook" });
@@ -61,23 +78,23 @@ public class TeamsWebhookController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Otrzymano webhook przychodzącego połączenia z Teams");
+            _logger.LogInformation("Otrzymano webhook przychodzącego połączenia");
 
-            // Odczytaj body request
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
-            
-            _logger.LogDebug("Webhook body: {Body}", body);
 
-            // Parsuj webhook data (Teams używa specyficznego formatu)
+            _logger.LogDebug("Incoming call webhook body: {Body}", body);
+
             var webhookData = ParseTeamsWebhook(body);
-            
+
             if (webhookData != null)
             {
-                // Przekaż do TeamsBot do obsługi
                 await _teamsBot.HandleIncomingCallWebhookAsync(webhookData);
-                
-                return Ok(new { message = "Webhook został przetworzony" });
+
+                return Ok(new { 
+                    message = "Webhook przychodzącego połączenia został przetworzony",
+                    endpoint = "https://rtmbot.sniezka.com/api/teamswebhook/incoming-call"
+                });
             }
 
             return BadRequest(new { error = "Nieprawidłowy format webhook" });
@@ -94,19 +111,23 @@ public class TeamsWebhookController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Otrzymano webhook aktualizacji połączenia z Teams");
+            _logger.LogInformation("Otrzymano webhook aktualizacji połączenia");
 
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
-            
+
             _logger.LogDebug("Call updated webhook body: {Body}", body);
 
             var webhookData = ParseTeamsWebhook(body);
-            
+
             if (webhookData != null)
             {
                 await _teamsBot.HandleCallUpdatedWebhookAsync(webhookData);
-                return Ok(new { message = "Webhook aktualizacji połączenia został przetworzony" });
+
+                return Ok(new { 
+                    message = "Webhook aktualizacji połączenia został przetworzony",
+                    endpoint = "https://rtmbot.sniezka.com/api/teamswebhook/call-updated"
+                });
             }
 
             return BadRequest(new { error = "Nieprawidłowy format webhook" });
@@ -123,19 +144,23 @@ public class TeamsWebhookController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Otrzymano webhook audio media z Teams");
+            _logger.LogInformation("Otrzymano webhook audio media");
 
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
-            
+
             _logger.LogDebug("Audio media webhook body: {Body}", body);
 
             var webhookData = ParseTeamsWebhook(body);
-            
+
             if (webhookData != null)
             {
                 await _teamsBot.HandleAudioMediaWebhookAsync(webhookData);
-                return Ok(new { message = "Webhook audio media został przetworzony" });
+
+                return Ok(new { 
+                    message = "Webhook audio media został przetworzony",
+                    endpoint = "https://rtmbot.sniezka.com/api/teamswebhook/audio-media"
+                });
             }
 
             return BadRequest(new { error = "Nieprawidłowy format webhook" });
@@ -151,46 +176,38 @@ public class TeamsWebhookController : ControllerBase
     {
         try
         {
-            // Teams webhook może mieć różne formaty, więc próbujemy parsować elastycznie
-            var jsonDoc = JsonDocument.Parse(body);
-            var root = jsonDoc.RootElement;
-
-            // Sprawdź czy to standardowy Teams webhook
-            if (root.TryGetProperty("value", out var valueArray) && 
-                valueArray.ValueKind == JsonValueKind.Array && 
-                valueArray.GetArrayLength() > 0)
+            if (string.IsNullOrEmpty(body))
             {
-                var firstValue = valueArray[0];
-                
-                return new TeamsWebhookData
-                {
-                    Resource = firstValue.GetProperty("resource").GetString() ?? "",
-                    ChangeType = firstValue.GetProperty("changeType").GetString() ?? "",
-                    ResourceData = firstValue.GetProperty("resourceData").GetRawText(),
-                    SubscriptionId = firstValue.GetProperty("subscriptionId").GetString() ?? "",
-                    SubscriptionExpirationDateTime = firstValue.GetProperty("subscriptionExpirationDateTime").GetString() ?? ""
-                };
+                return null;
             }
 
-            // Sprawdź czy to prostszy format
-            if (root.TryGetProperty("resource", out var resource))
-            {
-                return new TeamsWebhookData
-                {
-                    Resource = resource.GetString() ?? "",
-                    ChangeType = root.TryGetProperty("changeType", out var changeType) ? changeType.GetString() ?? "" : "",
-                    ResourceData = body,
-                    SubscriptionId = "",
-                    SubscriptionExpirationDateTime = ""
-                };
-            }
-
-            return null;
+            var webhookData = JsonSerializer.Deserialize<TeamsWebhookData>(body);
+            return webhookData;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Błąd podczas parsowania webhook Teams");
             return null;
         }
+    }
+
+    private string DetermineWebhookType(TeamsWebhookData webhookData)
+    {
+        if (webhookData.Resource.Contains("/communications/calls/"))
+        {
+            return webhookData.ChangeType switch
+            {
+                "created" => "Incoming Call",
+                "updated" => "Call Updated",
+                "deleted" => "Call Deleted",
+                _ => "Call Event"
+            };
+        }
+        else if (webhookData.Resource.Contains("/audioMedia"))
+        {
+            return "Audio Media";
+        }
+        
+        return "Unknown";
     }
 }

@@ -193,10 +193,3 @@ public class AudioCaptureService : IAudioCaptureService
     }
 }
 
-// Model klatki audio
-public class AudioFrame
-{
-    public byte[] AudioData { get; set; } = Array.Empty<byte>();
-    public DateTime Timestamp { get; set; }
-    public string CallId { get; set; } = string.Empty;
-}

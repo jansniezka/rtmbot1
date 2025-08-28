@@ -6,6 +6,7 @@ public class BotConfiguration
     public string MicrosoftAppPassword { get; set; } = string.Empty;
     public string MicrosoftAppType { get; set; } = string.Empty;
     public string MicrosoftAppTenantId { get; set; } = string.Empty;
+    public string PublicUrl { get; set; } = string.Empty;
 }
 
 public class AzureAdConfiguration

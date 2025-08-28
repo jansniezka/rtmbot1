@@ -1,3 +1,5 @@
+using RealTimeMediaBot.Models;
+
 namespace RealTimeMediaBot.Services;
 
 public interface IAudioCaptureService
