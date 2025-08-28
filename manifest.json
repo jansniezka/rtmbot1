@@ -1,0 +1,77 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "772fb043-1546-47cc-89f3-4bcaf404e8e2",
+  "developer": {
+    "name": "Real-Time Media Bot Developer",
+    "websiteUrl": "https://rtmbot.sniezka.com",
+    "privacyUrl": "https://rtmbot.sniezka.com/privacy",
+    "termsOfUseUrl": "https://rtmbot.sniezka.com/terms"
+  },
+  "name": {
+    "short": "Real-Time Media Bot",
+    "full": "Real-Time Media Bot - Audio Capture & Call Management"
+  },
+  "description": {
+    "short": "Bot do przechwytywania audio z połączeń Teams w czasie rzeczywistym",
+    "full": "Real-Time Media Bot automatycznie odbiera połączenia Teams, przechwytuje audio w czasie rzeczywistym, buforuje klatki audio i zapisuje je do plików WAV. Obsługuje również komendy tekstowe do zarządzania połączeniami."
+  },
+  "icons": {
+    "outline": "icon-outline.png",
+    "color": "icon-color.png"
+  },
+  "accentColor": "#0078D4",
+  "bots": [
+    {
+      "botId": "772fb043-1546-47cc-89f3-4bcaf404e8e2",
+      "scopes": [
+        "personal",
+        "team",
+        "groupchat"
+      ],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "supportsCalling": true,
+      "supportsVideo": false,
+      "commandLists": [
+        {
+          "scopes": [
+            "personal",
+            "team",
+            "groupchat"
+          ],
+          "commands": [
+            {
+              "title": "help",
+              "description": "Wyświetla listę dostępnych komend"
+            },
+            {
+              "title": "status",
+              "description": "Pokazuje status bota i aktywnych połączeń"
+            },
+            {
+              "title": "calls",
+              "description": "Lista wszystkich aktywnych połączeń"
+            },
+            {
+              "title": "audio",
+              "description": "Informacje o buforze audio"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "rtmbot.sniezka.com"
+  ],
+  "webApplicationInfo": {
+    "id": "772fb043-1546-47cc-89f3-4bcaf404e8e2",
+    "resource": "https://graph.microsoft.com"
+  }
+}

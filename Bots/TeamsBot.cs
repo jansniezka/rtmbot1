@@ -52,8 +52,11 @@ public class TeamsBot : IDisposable
             var accessToken = await _authService.GetAccessTokenAsync();
             _logger.LogInformation("✅ Token dostępu uzyskany pomyślnie!");
             
-            // Inicjalizacja Graph Client (uproszczona wersja)
-            _graphClient = new GraphServiceClient(new HttpClient());
+            // Inicjalizacja Graph Client z prawdziwym tokenem
+            var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            
+            _graphClient = new GraphServiceClient(httpClient);
             
             _logger.LogInformation("✅ Bot Teams został zainicjalizowany pomyślnie!");
             _logger.LogInformation("📡 WEBHOOK ENDPOINTS:");
@@ -181,31 +184,52 @@ public class TeamsBot : IDisposable
 
             _logger.LogInformation("📞 Akceptowanie przychodzącego połączenia: {CallId}", callId);
 
-            // TUTAJ BĘDZIE RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
-            // Po skonfigurowaniu appsettings.json z rzeczywistymi danymi Azure AD
-            // 
-            // Przykład rzeczywistego wywołania API:
-            // var answerRequest = new {
-            //     callbackUri = $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling",
-            //     mediaConfig = new {
-            //         "@odata.type" = "#microsoft.graph.serviceHostedMediaConfig"
-            //     },
-            //     acceptedModalities = new[] { "audio" }
-            // };
-            // 
-            // await _graphClient.Communications.Calls[callId]
-            //     .Answer
-            //     .PostAsync(answerRequest);
-
-            // Aktualnie: Symulacja akceptowania połączenia
-            if (_activeCalls.TryGetValue(callId, out var callInfo))
+            // RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
+            var answerRequest = new Microsoft.Graph.Communications.Calls.Item.Answer.AnswerPostRequestBody
             {
-                callInfo.State = CallState.Established;
-                callInfo.LastUpdated = DateTime.UtcNow;
-            }
+                CallbackUri = $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling",
+                AcceptedModalities = new List<Microsoft.Graph.Models.Modality?> 
+                { 
+                    Microsoft.Graph.Models.Modality.Audio 
+                },
+                MediaConfig = new Microsoft.Graph.Models.ServiceHostedMediaConfig
+                {
+                    OdataType = "#microsoft.graph.serviceHostedMediaConfig"
+                }
+            };
 
-            _logger.LogInformation("✅ Połączenie {CallId} zostało zaakceptowane (symulacja - gotowe do konfiguracji Graph API)", callId);
-            _logger.LogInformation("🔧 Aby włączyć rzeczywiste połączenia, skonfiguruj appsettings.json z danymi Azure AD");
+            _logger.LogInformation("🔗 Wywołuję Graph API: POST /communications/calls/{CallId}/answer", callId);
+            
+            try
+            {
+                await _graphClient.Communications.Calls[callId].Answer.PostAsync(answerRequest);
+                
+                _logger.LogInformation("✅ RZECZYWISTE połączenie {CallId} zostało zaakceptowane przez Graph API!", callId);
+                
+                // Aktualizuj lokalny stan
+                if (_activeCalls.TryGetValue(callId, out var callInfo))
+                {
+                    callInfo.State = CallState.Established;
+                    callInfo.LastUpdated = DateTime.UtcNow;
+                }
+            }
+            catch (Exception graphEx)
+            {
+                _logger.LogError(graphEx, "❌ BŁĄD Graph API podczas akceptowania połączenia {CallId}:", callId);
+                _logger.LogError("🔍 Szczegóły błędu: {ErrorMessage}", graphEx.Message);
+                _logger.LogError("🔍 Stack trace: {StackTrace}", graphEx.StackTrace);
+                
+                if (graphEx.InnerException != null)
+                {
+                    _logger.LogError("🔍 Inner exception: {InnerException}", graphEx.InnerException.Message);
+                }
+                
+                // Usuń połączenie z aktywnych jeśli nie udało się je zaakceptować
+                _activeCalls.TryRemove(callId, out _);
+                
+                // Rzuć exception z szczegółowymi informacjami
+                throw new InvalidOperationException($"Nie udało się zaakceptować połączenia {callId} przez Graph API: {graphEx.Message}", graphEx);
+            }
         }
         catch (Exception ex)
         {
@@ -221,24 +245,40 @@ public class TeamsBot : IDisposable
         {
             _logger.LogInformation("❌ Odrzucanie przychodzącego połączenia: {CallId}", callId);
 
-            // TUTAJ BĘDZIE RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
-            // Po skonfigurowaniu appsettings.json
-            //
-            // Przykład rzeczywistego wywołania API:
-            // var rejectRequest = new {
-            //     reason = "busy",
-            //     callbackUri = redirectUri ?? $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling"
-            // };
-            // 
-            // await _graphClient.Communications.Calls[callId]
-            //     .Reject
-            //     .PostAsync(rejectRequest);
-
-            // Aktualnie: Symulacja odrzucania połączenia
-            if (_activeCalls.TryRemove(callId, out var callInfo))
+            // RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
+            var rejectRequest = new Microsoft.Graph.Communications.Calls.Item.Reject.RejectPostRequestBody
             {
-                callInfo.State = CallState.Terminated;
-                _logger.LogInformation("✅ Połączenie {CallId} zostało odrzucone (symulacja)", callId);
+                Reason = Microsoft.Graph.Models.RejectReason.Busy,
+                CallbackUri = redirectUri ?? $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling"
+            };
+
+            _logger.LogInformation("🔗 Wywołuję Graph API: POST /communications/calls/{CallId}/reject", callId);
+            
+            try
+            {
+                await _graphClient.Communications.Calls[callId].Reject.PostAsync(rejectRequest);
+                
+                _logger.LogInformation("✅ RZECZYWISTE połączenie {CallId} zostało odrzucone przez Graph API!", callId);
+                
+                // Usuń z aktywnych połączeń
+                if (_activeCalls.TryRemove(callId, out var callInfo))
+                {
+                    callInfo.State = CallState.Terminated;
+                }
+            }
+            catch (Exception graphEx)
+            {
+                _logger.LogError(graphEx, "❌ BŁĄD Graph API podczas odrzucania połączenia {CallId}:", callId);
+                _logger.LogError("🔍 Szczegóły błędu: {ErrorMessage}", graphEx.Message);
+                _logger.LogError("🔍 Stack trace: {StackTrace}", graphEx.StackTrace);
+                
+                if (graphEx.InnerException != null)
+                {
+                    _logger.LogError("🔍 Inner exception: {InnerException}", graphEx.InnerException.Message);
+                }
+                
+                // Rzuć exception z szczegółowymi informacjami
+                throw new InvalidOperationException($"Nie udało się odrzucić połączenia {callId} przez Graph API: {graphEx.Message}", graphEx);
             }
         }
         catch (Exception ex)
@@ -279,17 +319,34 @@ public class TeamsBot : IDisposable
         {
             _logger.LogInformation("📴 Kończenie połączenia: {CallId}", callId);
 
-            // TUTAJ BĘDZIE RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
-            // Po skonfigurowaniu appsettings.json
-            //
-            // Przykład rzeczywistego wywołania API:
-            // await _graphClient.Communications.Calls[callId].DeleteAsync();
-
-            // Aktualnie: Symulacja kończenia połączenia
-            if (_activeCalls.TryRemove(callId, out var callInfo))
+            // RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
+            _logger.LogInformation("🔗 Wywołuję Graph API: DELETE /communications/calls/{CallId}", callId);
+            
+            try
             {
-                callInfo.State = CallState.Terminated;
-                _logger.LogInformation("✅ Połączenie {CallId} zostało zakończone (symulacja)", callId);
+                await _graphClient.Communications.Calls[callId].DeleteAsync();
+                
+                _logger.LogInformation("✅ RZECZYWISTE połączenie {CallId} zostało zakończone przez Graph API!", callId);
+                
+                // Usuń z aktywnych połączeń
+                if (_activeCalls.TryRemove(callId, out var callInfo))
+                {
+                    callInfo.State = CallState.Terminated;
+                }
+            }
+            catch (Exception graphEx)
+            {
+                _logger.LogError(graphEx, "❌ BŁĄD Graph API podczas kończenia połączenia {CallId}:", callId);
+                _logger.LogError("🔍 Szczegóły błędu: {ErrorMessage}", graphEx.Message);
+                _logger.LogError("🔍 Stack trace: {StackTrace}", graphEx.StackTrace);
+                
+                if (graphEx.InnerException != null)
+                {
+                    _logger.LogError("🔍 Inner exception: {InnerException}", graphEx.InnerException.Message);
+                }
+                
+                // Rzuć exception z szczegółowymi informacjami
+                throw new InvalidOperationException($"Nie udało się zakończyć połączenia {callId} przez Graph API: {graphEx.Message}", graphEx);
             }
         }
         catch (Exception ex)
@@ -306,39 +363,79 @@ public class TeamsBot : IDisposable
         {
             _logger.LogInformation("🎯 Dołączanie do spotkania: {MeetingUrl}", meetingUrl);
 
-            // TUTAJ BĘDZIE RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
-            // Po skonfigurowaniu appsettings.json
-            //
-            // Przykład rzeczywistego wywołania API:
-            // var joinRequest = new Call {
-            //     callbackUri = $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling",
-            //     requestedModalities = new[] { "audio" },
-            //     mediaConfig = new ServiceHostedMediaConfig(),
-            //     meetingInfo = ParseMeetingUrl(meetingUrl),
-            //     tenantId = _azureConfig.Value.TenantId
-            // };
-            // 
-            // var call = await _graphClient.Communications.Calls.PostAsync(joinRequest);
-
-            // Aktualnie: Symulacja dołączenia do spotkania
-            var callId = Guid.NewGuid().ToString();
-            var callInfo = new CallInfo
+            // RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
+            var meetingInfo = ParseMeetingUrl(meetingUrl);
+            
+            var joinRequest = new Microsoft.Graph.Models.Call
             {
-                CallId = callId,
-                CallerId = "meeting-join",
-                CallerDisplayName = displayName ?? "Bot",
-                State = CallState.Established,
-                MeetingUrl = meetingUrl,
-                Timestamp = DateTime.UtcNow,
-                LastUpdated = DateTime.UtcNow
+                CallbackUri = $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling",
+                RequestedModalities = new List<Microsoft.Graph.Models.Modality?> 
+                { 
+                    Microsoft.Graph.Models.Modality.Audio 
+                },
+                MediaConfig = new Microsoft.Graph.Models.ServiceHostedMediaConfig
+                {
+                    OdataType = "#microsoft.graph.serviceHostedMediaConfig"
+                },
+                MeetingInfo = meetingInfo,
+                TenantId = _azureConfig.Value.TenantId,
+                Source = new Microsoft.Graph.Models.ParticipantInfo
+                {
+                    Identity = new Microsoft.Graph.Models.IdentitySet
+                    {
+                        Application = new Microsoft.Graph.Models.Identity
+                        {
+                            Id = _botConfig.Value.MicrosoftAppId,
+                            DisplayName = displayName ?? "Real-Time Media Bot"
+                        }
+                    }
+                }
             };
 
-            _activeCalls.TryAdd(callInfo.CallId, callInfo);
-
-            _logger.LogInformation("✅ Symulacja dołączenia do spotkania: {CallId}", callInfo.CallId);
-            _logger.LogInformation("🔧 Aby włączyć rzeczywiste dołączanie, skonfiguruj appsettings.json z danymi Azure AD");
+            _logger.LogInformation("🔗 Wywołuję Graph API: POST /communications/calls (join meeting)");
             
-            return callInfo;
+            try
+            {
+                var call = await _graphClient.Communications.Calls.PostAsync(joinRequest);
+                
+                if (call?.Id != null)
+                {
+                    var callInfo = new CallInfo
+                    {
+                        CallId = call.Id,
+                        CallerId = "meeting-join",
+                        CallerDisplayName = displayName ?? "Bot",
+                        State = CallState.Establishing,
+                        MeetingUrl = meetingUrl,
+                        Timestamp = DateTime.UtcNow,
+                        LastUpdated = DateTime.UtcNow
+                    };
+
+                    _activeCalls.TryAdd(callInfo.CallId, callInfo);
+                    
+                    _logger.LogInformation("✅ RZECZYWISTE dołączenie do spotkania: {CallId}", callInfo.CallId);
+                    return callInfo;
+                }
+                else
+                {
+                    _logger.LogError("❌ Graph API zwróciło null call ID podczas dołączania do spotkania");
+                    throw new InvalidOperationException("Graph API zwróciło null call ID podczas dołączania do spotkania");
+                }
+            }
+            catch (Exception graphEx)
+            {
+                _logger.LogError(graphEx, "❌ BŁĄD Graph API podczas dołączania do spotkania {MeetingUrl}:", meetingUrl);
+                _logger.LogError("🔍 Szczegóły błędu: {ErrorMessage}", graphEx.Message);
+                _logger.LogError("🔍 Stack trace: {StackTrace}", graphEx.StackTrace);
+                
+                if (graphEx.InnerException != null)
+                {
+                    _logger.LogError("🔍 Inner exception: {InnerException}", graphEx.InnerException.Message);
+                }
+                
+                // Rzuć exception z szczegółowymi informacjami
+                throw new InvalidOperationException($"Nie udało się dołączyć do spotkania {meetingUrl} przez Graph API: {graphEx.Message}", graphEx);
+            }
         }
         catch (Exception ex)
         {
@@ -534,6 +631,52 @@ public class TeamsBot : IDisposable
         }
         
         return audioData;
+    }
+
+    // Parsowanie Meeting URL do MeetingInfo
+    private Microsoft.Graph.Models.MeetingInfo ParseMeetingUrl(string meetingUrl)
+    {
+        try
+        {
+            // Parsuj Teams meeting URL
+            if (meetingUrl.Contains("teams.microsoft.com"))
+            {
+                var uri = new Uri(meetingUrl);
+                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                
+                var threadId = query["threadId"];
+                var organizerId = query["organizerId"];
+                var tenantId = query["tenantId"];
+                
+                return new Microsoft.Graph.Models.OrganizerMeetingInfo
+                {
+                    OdataType = "#microsoft.graph.organizerMeetingInfo",
+                    Organizer = new Microsoft.Graph.Models.IdentitySet
+                    {
+                        User = new Microsoft.Graph.Models.Identity
+                        {
+                            Id = organizerId
+                        }
+                    }
+                };
+            }
+            
+            // Fallback - podstawowe meeting info
+            return new Microsoft.Graph.Models.OrganizerMeetingInfo
+            {
+                OdataType = "#microsoft.graph.organizerMeetingInfo"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ Nie udało się sparsować meeting URL: {MeetingUrl}", meetingUrl);
+            
+            // Zwróć podstawowe meeting info
+            return new Microsoft.Graph.Models.OrganizerMeetingInfo
+            {
+                OdataType = "#microsoft.graph.organizerMeetingInfo"
+            };
+        }
     }
 
     // Mapowanie stanu połączenia

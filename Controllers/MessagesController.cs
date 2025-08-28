@@ -15,15 +15,18 @@ public class MessagesController : ControllerBase
     private readonly ILogger<MessagesController> _logger;
     private readonly TeamsBot _teamsBot;
     private readonly IOptions<BotConfiguration> _botConfig;
+    private readonly IChatService _chatService;
 
     public MessagesController(
         ILogger<MessagesController> logger,
         TeamsBot teamsBot,
-        IOptions<BotConfiguration> botConfig)
+        IOptions<BotConfiguration> botConfig,
+        IChatService chatService)
     {
         _logger = logger;
         _teamsBot = teamsBot;
         _botConfig = botConfig;
+        _chatService = chatService;
     }
 
     [HttpPost] // POST /api/messages - główny endpoint dla wiadomości Teams
@@ -188,11 +191,7 @@ public class MessagesController : ControllerBase
                 text = GetAudioStatusMessage()
             },
             
-            _ when text.StartsWith("hello") || text.StartsWith("hi") || text.StartsWith("cześć") => new
-            {
-                type = "message",
-                text = $"Cześć {messageData.From?.Name ?? "Użytkowniku"}! 👋\n\nJestem Real-Time Media Bot. Mogę odbierać połączenia Teams i przechwytywać audio.\n\nNapisz `help` aby zobaczyć wszystkie dostępne komendy."
-            },
+            _ when text.StartsWith("hello") || text.StartsWith("hi") || text.StartsWith("cześć") => await HandleGreetingAsync(messageData),
             
             _ => new
             {
@@ -285,5 +284,41 @@ public class MessagesController : ControllerBase
         {
             return $"❌ Błąd podczas pobierania statusu audio: {ex.Message}";
         }
+    }
+
+    private async Task<object> HandleGreetingAsync(TeamsMessageData messageData)
+    {
+        // Spróbuj pobrać prawdziwe imię użytkownika z Graph API
+        string displayName = "Użytkowniku";
+        
+        if (!string.IsNullOrEmpty(messageData.From?.Id))
+        {
+            try
+            {
+                displayName = await _chatService.GetUserDisplayNameAsync(messageData.From.Id);
+                _logger.LogInformation("✅ Pobrano displayName z Graph API: {DisplayName}", displayName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ BŁĄD Graph API podczas pobierania displayName dla użytkownika {UserId}:", messageData.From.Id);
+                _logger.LogError("🔍 Szczegóły błędu: {ErrorMessage}", ex.Message);
+                
+                // Rzuć exception - nie używamy fallback
+                throw new InvalidOperationException($"Nie udało się pobrać displayName dla użytkownika {messageData.From.Id}: {ex.Message}", ex);
+            }
+        }
+        else if (!string.IsNullOrEmpty(messageData.From?.Name))
+        {
+            displayName = messageData.From.Name;
+            _logger.LogInformation("ℹ️ Używam displayName z wiadomości Teams: {DisplayName}", displayName);
+        }
+
+        return new
+        {
+            type = "message",
+            text = $"Cześć {displayName}! 👋\n\n" +
+                   "Jestem Real-Time Media Bot. Mogę odbierać połączenia Teams i przechwytywać audio.\n\n" +
+                   "Napisz `help` aby zobaczyć wszystkie dostępne komendy."
+        };
     }
 }

@@ -15,6 +15,7 @@ builder.Services.Configure<GraphConfiguration>(builder.Configuration.GetSection(
 // Rejestracja usług
 builder.Services.AddSingleton<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<IGraphService, GraphService>();
+builder.Services.AddSingleton<IChatService, ChatService>();
 builder.Services.AddSingleton<IAudioCaptureService, AudioCaptureService>();
 builder.Services.AddSingleton<TeamsBot>();
 
