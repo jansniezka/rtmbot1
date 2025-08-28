@@ -42,21 +42,28 @@ public class TeamsBot : IDisposable
     {
         try
         {
-            _logger.LogInformation("Inicjalizacja bota Teams z Microsoft Graph API...");
+            _logger.LogInformation("🚀 INICJALIZACJA BOTA TEAMS...");
+            _logger.LogInformation("🔧 Azure AD Tenant ID: {TenantId}", _azureConfig.Value.TenantId.Substring(0, Math.Min(8, _azureConfig.Value.TenantId.Length)) + "...");
+            _logger.LogInformation("🔧 Bot App ID: {AppId}", _botConfig.Value.MicrosoftAppId.Substring(0, Math.Min(8, _botConfig.Value.MicrosoftAppId.Length)) + "...");
+            _logger.LogInformation("🌐 Public URL: {PublicUrl}", _botConfig.Value.PublicUrl);
             
             // Uzyskanie tokenu dostępu
+            _logger.LogInformation("🔐 Uzyskiwanie tokenu dostępu z Azure AD...");
             var accessToken = await _authService.GetAccessTokenAsync();
+            _logger.LogInformation("✅ Token dostępu uzyskany pomyślnie!");
             
             // Inicjalizacja Graph Client (uproszczona wersja)
             _graphClient = new GraphServiceClient(new HttpClient());
             
-            _logger.LogInformation("Bot Teams został zainicjalizowany pomyślnie z Microsoft Graph API.");
-            _logger.LogInformation("Bot jest gotowy do odbierania połączeń na endpoint: {Endpoint}", 
-                $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling");
+            _logger.LogInformation("✅ Bot Teams został zainicjalizowany pomyślnie!");
+            _logger.LogInformation("📡 WEBHOOK ENDPOINTS:");
+            _logger.LogInformation("   - Azure calling: {AzureEndpoint}", $"{_botConfig.Value.PublicUrl}/api/calling");
+            _logger.LogInformation("   - Teams webhook: {TeamsEndpoint}", $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling");
+            _logger.LogInformation("🎯 Bot jest GOTOWY do odbierania połączeń!");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Błąd podczas inicjalizacji bota Teams");
+            _logger.LogError(ex, "❌ BŁĄD podczas inicjalizacji bota Teams");
             throw;
         }
     }
@@ -66,7 +73,11 @@ public class TeamsBot : IDisposable
     {
         try
         {
-            _logger.LogInformation("🔔 Otrzymano webhook przychodzącego połączenia: {Resource}", webhookData.Resource);
+            _logger.LogInformation("🔔 OTRZYMANO WEBHOOK PRZYCHODZĄCEGO POŁĄCZENIA!");
+            _logger.LogInformation("📋 Resource: {Resource}", webhookData.Resource);
+            _logger.LogInformation("📋 ChangeType: {ChangeType}", webhookData.ChangeType);
+            _logger.LogInformation("📋 SubscriptionId: {SubscriptionId}", webhookData.SubscriptionId);
+            _logger.LogInformation("📋 ResourceData: {ResourceData}", webhookData.ResourceData);
 
             // Parsuj dane połączenia z webhook zgodnie z dokumentacją Microsoft Graph
             var callInfo = ParseCallInfoFromWebhook(webhookData);
@@ -75,16 +86,25 @@ public class TeamsBot : IDisposable
                 // Dodaj do aktywnych połączeń
                 _activeCalls.TryAdd(callInfo.CallId, callInfo);
                 
-                _logger.LogInformation("✅ Dodano nowe połączenie: {CallId} od {CallerId}", 
-                    callInfo.CallId, callInfo.CallerId);
+                _logger.LogInformation("✅ DODANO NOWE POŁĄCZENIE:");
+                _logger.LogInformation("   - Call ID: {CallId}", callInfo.CallId);
+                _logger.LogInformation("   - Caller ID: {CallerId}", callInfo.CallerId);
+                _logger.LogInformation("   - Caller Name: {CallerName}", callInfo.CallerDisplayName);
+                _logger.LogInformation("   - State: {State}", callInfo.State);
+                _logger.LogInformation("   - Timestamp: {Timestamp}", callInfo.Timestamp);
 
                 // Automatycznie akceptuj połączenie
+                _logger.LogInformation("📞 AUTOMATYCZNIE AKCEPTUJĘ POŁĄCZENIE...");
                 await AcceptIncomingCallAsync(callInfo.CallId);
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ Nie udało się sparsować danych połączenia z webhook!");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Błąd podczas obsługi webhook przychodzącego połączenia");
+            _logger.LogError(ex, "❌ BŁĄD podczas obsługi webhook przychodzącego połączenia");
         }
     }
 

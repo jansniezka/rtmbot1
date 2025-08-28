@@ -27,12 +27,18 @@ public class TeamsWebhookController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Otrzymano webhook calling z Teams na publicznym endpoincie");
+            _logger.LogInformation("🔔 OTRZYMANO WEBHOOK CALLING z Teams!");
+            _logger.LogInformation("📍 Endpoint: POST /api/teamswebhook/calling");
+            _logger.LogInformation("🌐 Remote IP: {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
+            _logger.LogInformation("📋 User-Agent: {UserAgent}", Request.Headers.UserAgent.ToString());
+            _logger.LogInformation("📋 Content-Type: {ContentType}", Request.ContentType);
+            _logger.LogInformation("📏 Content-Length: {ContentLength}", Request.ContentLength);
 
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
 
-            _logger.LogDebug("Calling webhook body: {Body}", body);
+            _logger.LogInformation("📄 Webhook body length: {Length} characters", body.Length);
+            _logger.LogInformation("📄 Webhook body: {Body}", body);
 
             var webhookData = ParseTeamsWebhook(body);
 
