@@ -71,6 +71,43 @@ public class TeamsBot : IDisposable
         }
     }
 
+    // GENEROWANIE MEDIA SESSION CONFIGURATION BLOB - ZGODNIE Z DOKUMENTACJĄ
+    private string GenerateMediaSessionConfigurationBlob()
+    {
+        // Media Session Configuration dla real-time audio capture
+        // Zgodnie z Microsoft Graph Communications API documentation
+        var mediaConfig = new
+        {
+            mediaSessionId = Guid.NewGuid().ToString(),
+            callbackUri = $"{_botConfig.Value.PublicUrl}/api/calling",
+            supportedModalities = new[] { "audio" },
+            audioSettings = new
+            {
+                format = "pcm16",
+                sampleRate = 16000,
+                channels = 1,
+                enableRealTimeMedia = true,
+                enableRecording = true
+            },
+            endpoints = new[]
+            {
+                new
+                {
+                    type = "audio",
+                    direction = "receive",
+                    mediaSessionId = Guid.NewGuid().ToString()
+                }
+            }
+        };
+
+        var jsonConfig = System.Text.Json.JsonSerializer.Serialize(mediaConfig);
+        var encodedConfig = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(jsonConfig));
+        
+        _logger.LogDebug("🎵 Wygenerowano Media Session Configuration Blob: {Length} znaków", encodedConfig.Length);
+        
+        return encodedConfig;
+    }
+
     // RZECZYWISTA IMPLEMENTACJA - Obsługa webhook'ów przychodzących połączeń
     public async Task HandleIncomingCallWebhookAsync(TeamsWebhookData webhookData)
     {
@@ -184,18 +221,20 @@ public class TeamsBot : IDisposable
 
             _logger.LogInformation("📞 Akceptowanie przychodzącego połączenia: {CallId}", callId);
 
-            // RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API
+            // RZECZYWISTA IMPLEMENTACJA Microsoft Graph Communications API - POPRAWIONA ZGODNIE Z DOKUMENTACJĄ
             var answerRequest = new Microsoft.Graph.Communications.Calls.Item.Answer.AnswerPostRequestBody
             {
-                CallbackUri = $"{_botConfig.Value.PublicUrl}/api/teamswebhook/calling",
+                CallbackUri = $"{_botConfig.Value.PublicUrl}/api/calling",
                 AcceptedModalities = new List<Microsoft.Graph.Models.Modality?> 
                 { 
                     Microsoft.Graph.Models.Modality.Audio 
                 },
-                MediaConfig = new Microsoft.Graph.Models.ServiceHostedMediaConfig
+                MediaConfig = new Microsoft.Graph.Models.AppHostedMediaConfig
                 {
-                    OdataType = "#microsoft.graph.serviceHostedMediaConfig"
-                }
+                    OdataType = "#microsoft.graph.appHostedMediaConfig",
+                    Blob = GenerateMediaSessionConfigurationBlob()
+                },
+                ParticipantCapacity = 200  // Dla policy-based recording
             };
 
             _logger.LogInformation("🔗 Wywołuję Graph API: POST /communications/calls/{CallId}/answer", callId);
