@@ -451,7 +451,7 @@ appsettings.Production.json
 appsettings.Development.json
 appsettings.Local.json
 appsettings.*.json
-!appsettings.json
+appsettings.json
 
 # SSL certificates and keys
 *.pfx

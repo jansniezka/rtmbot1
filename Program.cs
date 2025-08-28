@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using RealTimeMediaBot.Services;
 using RealTimeMediaBot.Bots;
 using RealTimeMediaBot.Models;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,29 +91,62 @@ app.MapGet("/api/calling", () => new {
     }
 });
 
-// POST endpoint dla Azure Bot Service - przekierowanie HTTP 307
+// POST endpoint dla Azure Bot Service - BEZPOŚREDNIA OBSŁUGA
 app.MapPost("/api/calling", async (HttpContext context) =>
 {
     var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    var teamsBot = context.RequestServices.GetRequiredService<TeamsBot>();
     
-    logger.LogInformation("🎯 OTRZYMANO POST REQUEST na /api/calling!");
-    logger.LogInformation("🌐 Remote IP: {RemoteIp}", context.Connection.RemoteIpAddress);
-    logger.LogInformation("📋 User-Agent: {UserAgent}", context.Request.Headers.UserAgent.ToString());
-    logger.LogInformation("📋 Content-Type: {ContentType}", context.Request.ContentType);
-    logger.LogInformation("📏 Content-Length: {ContentLength}", context.Request.ContentLength);
-    
-    // Przeczytaj body przed przekierowaniem
-    context.Request.EnableBuffering();
-    using var reader = new StreamReader(context.Request.Body, leaveOpen: true);
-    var body = await reader.ReadToEndAsync();
-    context.Request.Body.Position = 0;
-    
-    logger.LogInformation("📄 Request body length: {Length} characters", body.Length);
-    logger.LogInformation("📄 Request body: {Body}", body);
-    logger.LogInformation("🔄 Przekierowuję na /api/teamswebhook/calling...");
-    
-    // Przekieruj POST /api/calling -> /api/teamswebhook/calling
-    return Results.Redirect("/api/teamswebhook/calling", permanent: false, preserveMethod: true);
+    try
+    {
+        logger.LogInformation("🎯 OTRZYMANO POST REQUEST na /api/calling!");
+        logger.LogInformation("🌐 Remote IP: {RemoteIp}", context.Connection.RemoteIpAddress);
+        logger.LogInformation("📋 User-Agent: {UserAgent}", context.Request.Headers.UserAgent.ToString());
+        logger.LogInformation("📋 Content-Type: {ContentType}", context.Request.ContentType);
+        logger.LogInformation("📏 Content-Length: {ContentLength}", context.Request.ContentLength);
+        
+        // Przeczytaj body
+        using var reader = new StreamReader(context.Request.Body);
+        var body = await reader.ReadToEndAsync();
+        
+        logger.LogInformation("📄 Request body length: {Length} characters", body.Length);
+        logger.LogInformation("📄 Request body: {Body}", body);
+        
+        // BEZPOŚREDNIO PRZETWÓRZ WEBHOOK - BEZ PRZEKIEROWANIA!
+        logger.LogInformation("🔄 Przetwarzam webhook bezpośrednio...");
+        
+        // Parsuj webhook data
+        var webhookData = JsonSerializer.Deserialize<TeamsWebhookData>(
+            body, 
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+        );
+        
+        if (webhookData != null)
+        {
+            logger.LogInformation("✅ Webhook sparsowany pomyślnie!");
+            logger.LogInformation("📋 Resource: {Resource}", webhookData.Resource);
+            logger.LogInformation("📋 ChangeType: {ChangeType}", webhookData.ChangeType);
+            
+            // Przekaż do TeamsBot
+            await teamsBot.HandleIncomingCallWebhookAsync(webhookData);
+            
+            return Results.Ok(new { 
+                message = "Webhook przetworzony pomyślnie",
+                timestamp = DateTime.UtcNow,
+                callbackUri = "https://rtmbot.sniezka.com/api/calling"
+            });
+        }
+        else
+        {
+            logger.LogWarning("⚠️ Nie udało się sparsować webhook data!");
+            return Results.BadRequest(new { error = "Invalid webhook format" });
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ BŁĄD podczas przetwarzania webhook na /api/calling");
+        return Results.StatusCode(500);
+    }
 });
 
 // Uruchom aplikację
