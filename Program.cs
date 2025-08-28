@@ -65,5 +65,12 @@ app.MapGet("/api/calling", () => new {
     }
 });
 
+// POST endpoint dla Azure Bot Service - przekierowanie HTTP 307
+app.MapPost("/api/calling", (HttpContext context) =>
+{
+    // Przekieruj POST /api/calling -> /api/teamswebhook/calling
+    return Results.Redirect("/api/teamswebhook/calling", permanent: false, preserveMethod: true);
+});
+
 // Uruchom aplikację
 await app.RunAsync();
